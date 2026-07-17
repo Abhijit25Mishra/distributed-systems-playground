@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+
+# Go
+*.exe
+*.test
+*.out
+go.work.sum
+
+# Maelstrom artifacts
+store/
+maelstrom.tar.bz2
+maelstrom/
+
+# macOS / Linux
+.DS_Store
+*~
+
+# Editors / local
+.idea/
+.vscode/
+.claude/settings.local.json
+
+# Env
+.env
+.env.*
