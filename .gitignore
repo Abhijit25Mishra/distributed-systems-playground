@@ -20,6 +20,9 @@ maelstrom/
 .DS_Store
 *~
 
+# Local scratch (profile repo clone etc.)
+tmp/
+
 # Editors / local
 .idea/
 .vscode/
