@@ -4,6 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Distributed Systems Playground</title>
+    <meta
+      name="description"
+      content="Interactive, deterministic simulations of distributed systems concepts, built chapter by chapter alongside Designing Data-Intensive Applications."
+    />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- Matches --page in tokens.css. Kept in sync with the manual toggle by
+         the theme provider; these two cover the OS preference before React
+         has run. -->
+    <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Distributed Systems Playground" />
+    <meta
+      property="og:description"
+      content="Interactive, deterministic simulations of distributed systems concepts, built alongside DDIA."
+    />
+    <meta name="twitter:card" content="summary" />
+
+    <!--
+      Theme stamp, before first paint.
+
+      Without this the page renders in the OS theme for one frame and then
+      swaps to the stored preference, which is a visible white flash for a
+      visitor who chose dark. It has to be inline and synchronous: a module
+      script is deferred, and deferred is too late.
+    -->
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('dsp-theme')
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.dataset.theme = stored
+          }
+        } catch (error) {
+          // Storage blocked. The media query in tokens.css still applies.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

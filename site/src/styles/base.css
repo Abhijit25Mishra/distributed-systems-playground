@@ -1,0 +1,284 @@
+/*
+ * Base layer — reset, document typography, focus, prose.
+ * Reads tokens only. No raw colours below this line.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  /* The header is sticky at 64px. Without this, jumping to an in-page anchor
+   * parks the target underneath it, and so does tabbing to an off-screen
+   * focusable element. */
+  scroll-padding-top: 5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--page);
+  color: var(--ink-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+canvas {
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a,
+button,
+[role='button'] {
+  /* Removes the 300ms double-tap-zoom wait on touch, and replaces the default
+   * grey flash with something that belongs to the palette. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: var(--accent-wash);
+}
+
+.prose h2,
+.prose h3 {
+  scroll-margin-top: 5rem;
+}
+
+/* ── Focus ──────────────────────────────────────────────────────────────
+ * One visible focus treatment, everywhere, keyboard-only. The offset keeps
+ * the ring clear of hairline borders so it never reads as a doubled edge.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-interactive);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--ink-primary);
+}
+
+/* ── Headings ───────────────────────────────────────────────────────────
+ * Hierarchy comes from weight and colour first, scale second. Screaming
+ * H1s are a substitute for structure, not structure itself.
+ */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 500;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  text-underline-offset: 0.22em;
+  text-decoration-thickness: 1px;
+  transition: color var(--duration-fast) var(--ease);
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ── Utility primitives ─────────────────────────────────────────────── */
+
+.label {
+  font-size: var(--text-micro);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--ink-muted);
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'zero' 1;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skipLink {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-overlay);
+  padding: var(--space-2) var(--space-3);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--text-small);
+  border-radius: var(--radius-interactive);
+  transform: translateY(-200%);
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+}
+
+/* ── Prose ──────────────────────────────────────────────────────────────
+ * The one place the sans face is used. Write-ups and journal entries are
+ * read at length; a monospaced measure would cost real reading speed.
+ */
+.prose {
+  font-family: var(--font-sans);
+  font-size: var(--text-subhead);
+  line-height: var(--leading-body);
+  color: var(--ink-secondary);
+  max-width: var(--measure);
+  font-variant-numeric: normal;
+}
+
+.prose > * + * {
+  margin-top: var(--space-4);
+}
+
+.prose h2,
+.prose h3 {
+  font-family: var(--font-mono);
+  color: var(--ink-primary);
+  margin-top: var(--space-7);
+}
+
+.prose h2 {
+  font-size: var(--text-section);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.prose h3 {
+  font-size: var(--text-subhead);
+}
+
+.prose strong {
+  color: var(--ink-primary);
+  font-weight: 600;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: var(--space-5);
+}
+
+.prose li + li {
+  margin-top: var(--space-2);
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-interactive);
+  padding: 0.08em 0.34em;
+}
+
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  line-height: var(--leading-snug);
+  background: var(--surface-sunken);
+  border: 1px solid var(--rule);
+  color: var(--ink-primary);
+  padding: var(--space-4);
+  overflow-x: auto;
+}
+
+.prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+.prose blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: var(--space-4);
+  color: var(--ink-muted);
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin-block: var(--space-6);
+}
+
+/* Wide content scrolls inside its own container. The page body never
+ * scrolls horizontally. */
+.prose .tableWrap,
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+}
+
+.prose table {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 32rem;
+}
+
+.prose th,
+.prose td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.prose th {
+  color: var(--ink-primary);
+  font-weight: 500;
+  background: var(--surface-sunken);
+  white-space: nowrap;
+}
+
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}

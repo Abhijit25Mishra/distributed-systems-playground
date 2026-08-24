@@ -1,0 +1,258 @@
+/*
+ * Design tokens — the single source of truth for the site's visual language.
+ *
+ * AGENT-OWNED. Two rules govern this file:
+ *
+ * 1. Nothing else in the codebase may write a raw colour. Components reference
+ *    roles (--ink-primary, --rule, --accent), never hex. That is what makes
+ *    light/dark a one-file change instead of a site-wide rewrite.
+ *
+ * 2. Canvas renderers read these same tokens at runtime via getComputedStyle
+ *    (see theme/vizTokens.ts). A visualization that hardcodes a fill colour
+ *    breaks theming for every future visualization, and retrofitting it later
+ *    across five of them is the expensive path.
+ *
+ * Every contrast figure below was measured, not estimated.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ── Surfaces ─────────────────────────────────────────────────────────
+   * Cool neutral throughout. No pure white, no pure black: pure values
+   * flatten depth and make hairlines either invisible or harsh.
+   */
+  --page: #f5f6f8;
+  --surface: #fdfdfe;
+  --surface-sunken: #eef0f3;
+
+  /* ── Ink ──────────────────────────────────────────────────────────────
+   * Contrast measured against --page.
+   */
+  --ink-primary: #111317; /* 17.20:1 */
+  --ink-secondary: #4d525b; /*  7.26:1 */
+  --ink-muted: #697079; /*  4.63:1 — smallest text still AA */
+  --ink-faint: #7f848d; /*  3.34:1 — non-text only: rules, ticks, disabled */
+
+  /* ── Hairlines ────────────────────────────────────────────────────────
+   * The site is built from rules, not cards. These carry the structure.
+   */
+  --rule: #e0e2e7;
+  --rule-strong: #cdd0d7;
+
+  /* ── Accent ───────────────────────────────────────────────────────────
+   * One accent, signal orange, 79% saturation (kept under the 80% ceiling
+   * so it reads as an instrument marking rather than a neon glow).
+   *
+   * Scope rule: the accent belongs to the CHROME only — links, focus, the
+   * primary action, the live marker. It never appears inside a plot area,
+   * where hue is a data channel. That spatial separation is what lets the
+   * accent share a hue family with categorical slot 2 without ambiguity.
+   */
+  --accent: #9a3412; /* 6.76:1 on --page */
+  --accent-hover: #7d2a0e; /* deepened, not brightened: keeps the white label above 4.5:1 */
+  --accent-ink: #fdfdfe; /* 7.19:1 on --accent */
+  --accent-wash: rgba(154, 52, 18, 0.08);
+
+  /* ── Status ───────────────────────────────────────────────────────────
+   * Reserved. Never reused as a series colour. Always paired with a text
+   * label, never carrying meaning through hue alone.
+   */
+  --signal-live: #0f7a44; /* 5.00:1 */
+  --signal-planned: #697079;
+
+  /* ── Categorical series ───────────────────────────────────────────────
+   * Adopted from the validated reference palette and re-validated against
+   * this site's own surfaces. Assign in fixed slot order, never cycled.
+   *
+   *   node scripts/validate_palette.js "<slots>" --mode light --surface "#fdfdfe"
+   *   → all checks pass (worst adjacent CVD dE 9.1, normal-vision dE 19.6)
+   *
+   * HARD LIMIT, measured: on a ring any two nodes can end up visually
+   * adjacent, which is the all-pairs case, and only the FIRST THREE slots
+   * clear all-pairs. Slot 4 puts yellow beside orange (normal-vision dE
+   * 10.6, below the 15 floor); slot 5 puts magenta beside aqua (deutan dE
+   * 1.6 — indistinguishable to red-green colourblind viewers).
+   *
+   * Therefore: past three nodes, colour is decoration and the direct label
+   * on each arc is what actually carries identity. Never ship a ring whose
+   * nodes are distinguished by colour alone.
+   */
+  --series-1: #2a78d6; /* blue    */
+  --series-2: #eb6834; /* orange  */
+  --series-3: #1baf7a; /* aqua    */
+  --series-4: #eda100; /* yellow  */
+  --series-5: #e87ba4; /* magenta */
+  --series-6: #008300; /* green   */
+  --series-7: #4a3aa7; /* violet  */
+  --series-8: #e34948; /* red     */
+
+  /* ── Plot chrome ──────────────────────────────────────────────────────
+   * Deliberately recessive. The data is the figure; the axes are furniture.
+   */
+  --plot-surface: #fdfdfe;
+  --plot-grid: #e6e8ec;
+  --plot-axis: #c3c7cf;
+  --plot-ink: #4d525b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+
+    --page: #0b0c0e;
+    --surface: #131417;
+    --surface-sunken: #08090b;
+
+    --ink-primary: #f2f3f5; /* 17.62:1 */
+    --ink-secondary: #a8abb3; /*  8.52:1 */
+    --ink-muted: #8b8f98; /*  6.04:1 */
+    --ink-faint: #6b6f78; /*  3.89:1 — non-text only */
+
+    --rule: #24262b;
+    --rule-strong: #33363d;
+
+    --accent: #e8853f; /* 7.32:1 on --page */
+    --accent-hover: #f59a5c;
+    --accent-ink: #0b0c0e; /* 7.32:1 on --accent */
+    --accent-wash: rgba(232, 133, 63, 0.12);
+
+    --signal-live: #3fbf7f; /* 8.36:1 */
+    --signal-planned: #8b8f98;
+
+    /* Same eight hues, re-stepped for the dark surface. Not an automatic
+     * flip: each step was chosen for the dark lightness band and the set
+     * re-validated (worst adjacent CVD dE 8.4, normal-vision dE 19.3). */
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+
+    --plot-surface: #131417;
+    --plot-grid: #1e2025;
+    --plot-axis: #33363d;
+    --plot-ink: #a8abb3;
+  }
+}
+
+/* The manual toggle must beat the OS preference in both directions. The
+ * :where() above keeps the media block at zero specificity so this wins. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --page: #0b0c0e;
+  --surface: #131417;
+  --surface-sunken: #08090b;
+
+  --ink-primary: #f2f3f5;
+  --ink-secondary: #a8abb3;
+  --ink-muted: #8b8f98;
+  --ink-faint: #6b6f78;
+
+  --rule: #24262b;
+  --rule-strong: #33363d;
+
+  --accent: #e8853f;
+  --accent-hover: #f59a5c;
+  --accent-ink: #0b0c0e;
+  --accent-wash: rgba(232, 133, 63, 0.12);
+
+  --signal-live: #3fbf7f;
+  --signal-planned: #8b8f98;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+
+  --plot-surface: #131417;
+  --plot-grid: #1e2025;
+  --plot-axis: #33363d;
+  --plot-ink: #a8abb3;
+}
+
+:root {
+  /* ── Type ─────────────────────────────────────────────────────────────
+   * Two voices from one family. Mono carries everything structural and
+   * numeric — nav, index rows, controls, seeds, counts, badges. Sans
+   * carries prose only, where a monospaced measure would slow reading.
+   */
+  --font-mono:
+    'Geist Mono Variable', ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Calibrated for mono, not sans. A monospaced face runs roughly 25% wider
+   * per character, so a display size that gives two lines in Geist gives
+   * three in Geist Mono. Capped where the masthead headline lands on two
+   * lines at 1440px. */
+  --text-display: clamp(1.875rem, 1.4rem + 1.6vw, 2.625rem);
+  --text-title: clamp(1.625rem, 1.35rem + 1.1vw, 2.25rem);
+  --text-section: 1.3125rem;
+  --text-subhead: 1.0625rem;
+  --text-body: 1rem;
+  --text-small: 0.8125rem;
+  --text-micro: 0.6875rem;
+
+  --leading-tight: 1.12;
+  --leading-snug: 1.35;
+  --leading-body: 1.65;
+
+  --tracking-tight: -0.022em;
+  --tracking-normal: 0;
+  --tracking-label: 0.13em;
+
+  /* Measure. Prose never exceeds this; it is the difference between a page
+   * that reads and a page that is merely legible. */
+  --measure: 68ch;
+  --measure-narrow: 56ch;
+
+  /* ── Space ────────────────────────────────────────────────────────────
+   * 4px base, compact density. Instrument, not art gallery.
+   */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+
+  --shell-max: 1120px;
+  --shell-pad: clamp(1rem, 0.4rem + 2.4vw, 2.5rem);
+
+  /* ── Shape ────────────────────────────────────────────────────────────
+   * One documented rule, applied everywhere: structural surfaces are sharp
+   * (0), anything you can click is 2px. No third value exists.
+   */
+  --radius-structural: 0;
+  --radius-interactive: 2px;
+
+  /* ── Motion ───────────────────────────────────────────────────────────
+   * MOTION_INTENSITY 3. State transitions and one purposeful reveal. No
+   * scroll choreography, no infinite loops, no parallax. An instrument
+   * that fidgets is a broken instrument.
+   */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 90ms;
+  --duration-base: 180ms;
+
+  --z-header: 10;
+  --z-overlay: 40;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+  }
+}
