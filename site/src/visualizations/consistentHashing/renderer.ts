@@ -51,8 +51,6 @@ export interface RingScene {
   readonly focusStrength?: 'strong' | 'soft'
   /** The request currently being routed, if any. */
   readonly flight?: Flight | undefined
-  /** Requests already routed, which stay marked so the past is visible. */
-  readonly routed?: readonly RoutingTrace[] | undefined
 }
 
 const RING_INSET = 0.78
@@ -76,7 +74,8 @@ const FLIGHT_DOT_RADIUS = 5
 const TRAIL_WIDTH = 4
 /** Surface-coloured gap each side of the trail, so it never merges with a band. */
 const TRAIL_HALO = 2
-const ROUTED_DOT_RADIUS = 3
+/** Size the flying key shrinks to as it settles into the cloud. */
+const SETTLED_DOT_RADIUS = 3
 const KEY_DOT_RADIUS = 1.6
 const LANDING_LEADER_START = 8
 const LANDING_LEADER_END = 22
@@ -86,11 +85,11 @@ function colorFor(tokens: VizTokens, nodeIds: readonly NodeId[], nodeId: NodeId)
   return seriesColor(tokens, nodeIds.indexOf(nodeId))
 }
 
-type Mark = 'arc' | 'key' | 'tick' | 'label' | 'routed'
+type Mark = 'arc' | 'key' | 'tick' | 'label'
 
 const DIM: Record<'strong' | 'soft', Record<Mark, number>> = {
-  strong: { arc: 0.15, key: 0.08, tick: 0.2, label: 0.25, routed: 0.2 },
-  soft: { arc: 0.45, key: 0.09, tick: 0.5, label: 0.6, routed: 0.45 },
+  strong: { arc: 0.15, key: 0.08, tick: 0.2, label: 0.25 },
+  soft: { arc: 0.45, key: 0.09, tick: 0.5, label: 0.6 },
 }
 
 /**
@@ -164,7 +163,6 @@ export function drawRing(
   drawArcs(ctx, tokens, scene, arcs, center, radius)
   drawKeys(ctx, tokens, scene, center, radius)
   drawTicks(ctx, tokens, scene, center, radius)
-  drawRouted(ctx, tokens, scene, center, radius)
 
   if (scene.flight) {
     drawFlight(ctx, tokens, scene, scene.flight, center, radius)
@@ -309,54 +307,6 @@ function drawTicks(
     ctx.moveTo(inner.x, inner.y)
     ctx.lineTo(outer.x, outer.y)
     ctx.stroke()
-  })
-
-  ctx.globalAlpha = 1
-}
-
-/**
- * Requests already routed, left in the key cloud so the past is visible.
- *
- * Drawn at the cloud radius, not on the band, and that is the whole point.
- * A routed request is one of the keys already on screen; putting its mark on
- * the band made it look like a different kind of object living somewhere the
- * other keys do not, which is exactly the confusion that made twelve requests
- * and two thousand keys read as unrelated populations.
- *
- * In the owning node's colour rather than the accent: once a request has
- * resolved it is no longer live, it is a fact about the distribution, and the
- * accent is reserved for the one thing currently happening.
- */
-function drawRouted(
-  ctx: CanvasRenderingContext2D,
-  tokens: VizTokens,
-  scene: RingScene,
-  center: Point,
-  radius: number,
-): void {
-  const routed = scene.routed
-  if (!routed || routed.length === 0) {
-    return
-  }
-
-  const cloudRadius = radius * KEY_RADIUS_RATIO
-
-  routed.forEach((trace) => {
-    const point = pointOn(center, cloudRadius, trace.keyAngle)
-
-    ctx.globalAlpha = alphaFor(scene, trace.owner, 'routed', 1)
-
-    // A surface ring, so a routed key reads as one of the cloud dots turned up
-    // rather than as a new mark laid over them.
-    ctx.beginPath()
-    ctx.arc(point.x, point.y, ROUTED_DOT_RADIUS + 1.5, 0, Math.PI * 2)
-    ctx.fillStyle = tokens.surface
-    ctx.fill()
-
-    ctx.beginPath()
-    ctx.arc(point.x, point.y, ROUTED_DOT_RADIUS, 0, Math.PI * 2)
-    ctx.fillStyle = colorFor(tokens, scene.nodeIds, trace.owner)
-    ctx.fill()
   })
 
   ctx.globalAlpha = 1
@@ -592,7 +542,7 @@ function drawFlyingKey(
     angle = trace.landingAngle
     distance = radius - (radius - radius * KEY_RADIUS_RATIO) * settle
     fill = blend(tokens.accent, colorFor(tokens, scene.nodeIds, trace.owner), settle)
-    size = FLIGHT_DOT_RADIUS - (FLIGHT_DOT_RADIUS - ROUTED_DOT_RADIUS) * settle
+    size = FLIGHT_DOT_RADIUS - (FLIGHT_DOT_RADIUS - SETTLED_DOT_RADIUS) * settle
   }
 
   const point = pointOn(center, distance, angle)

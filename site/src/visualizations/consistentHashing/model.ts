@@ -79,8 +79,8 @@ function assignByModN(keys: readonly KeyId[], nodeIds: readonly NodeId[]): Assig
   return assignment
 }
 
-function churn(before: Assignment, after: Assignment, keyCount: number): number {
-  return keyCount === 0 ? 0 : diff(before, after).length / keyCount
+function churnKeys(before: Assignment, after: Assignment): number {
+  return diff(before, after).length
 }
 
 export function buildRingModel(params: RingParams): RingModel {
@@ -95,12 +95,15 @@ export function buildRingModel(params: RingParams): RingModel {
   // anything: the number is the argument, and it should not require an
   // interaction to discover.
   const grownIds = nodeNames(params.nodeCount + 1)
-  const ringChurn = churn(assignment, assign(buildRing(grownIds, params.virtualNodes), keys), keys.length)
-  const modNChurn = churn(
+  const ringChurnKeys = churnKeys(
+    assignment,
+    assign(buildRing(grownIds, params.virtualNodes), keys),
+  )
+  const modNChurnKeys = churnKeys(
     assignByModN(keys, nodeIds),
     assignByModN(keys, grownIds),
-    keys.length,
   )
+  const asFraction = (moved: number) => (keys.length === 0 ? 0 : moved / keys.length)
 
   const counts = loadDistribution(assignment)
   const assigned = assignment.size
@@ -121,7 +124,7 @@ export function buildRingModel(params: RingParams): RingModel {
     assignment,
     loads,
     skew: loadSkew(assignment, nodeIds),
-    ringChurn,
-    modNChurn,
+    ringChurn: asFraction(ringChurnKeys),
+    modNChurn: asFraction(modNChurnKeys),
   }
 }

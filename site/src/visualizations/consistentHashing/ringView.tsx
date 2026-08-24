@@ -5,8 +5,17 @@ import type { RingParams } from './model'
 import { ownedArcs } from './geometry'
 import { phaseAt, traceRequest } from './trace'
 import type { RoutingTrace } from './trace'
-import { cursorState, DEFAULT_REQUEST_COUNT, requestLabel, sampleRequests } from './timeline'
-import { usePrefersReducedMotion, useTimeline } from './useTimeline'
+import {
+  buildRequests,
+  cursorState,
+  flightSeconds,
+  keysFromSlider,
+  KEY_SLIDER_STEPS,
+  READABLE_FLIGHT_SECONDS,
+  requestLabel,
+  sliderFromKeys,
+} from './timeline'
+import { usePrefersReducedMotion, useThrottled, useTimeline } from './useTimeline'
 import { Transport, TracePanel } from './transport'
 import { useVizTokens } from '../../theme/vizTokens'
 import { seriesColor } from '../../theme/vizTokens'
@@ -94,6 +103,9 @@ const DEFAULTS: RingParams = {
   seed: 54,
 }
 
+/** How long the narration holds one key when flights are too fast to read. */
+const NARRATION_HOLD_MS = 220
+
 interface RingViewProps {
   /** Hides the parameter controls and the step narration. Homepage figure. */
   readonly compact?: boolean
@@ -107,14 +119,12 @@ export function RingView({ compact = false }: RingViewProps) {
   const reducedMotion = usePrefersReducedMotion()
   const model = useMemo(() => buildRingModel(params), [params])
 
-  // Sampled from the keys the figure is already drawing, not invented
-  // alongside them. Every flight is one of the dots on screen.
-  const requests = useMemo(
-    () => sampleRequests(model.keys, DEFAULT_REQUEST_COUNT),
-    [model.keys],
-  )
+  // Every key on the ring, not a sample of them. The figure routes exactly
+  // what it claims to be showing.
+  const requests = useMemo(() => buildRequests(model.keys), [model.keys])
 
-  const timeline = useTimeline(requests.length, !reducedMotion)
+  const pace = flightSeconds(requests.length)
+  const timeline = useTimeline(requests.length, pace, !reducedMotion)
   const state = cursorState(timeline.cursor, requests.length)
   const phase = phaseAt(state.progress)
 
@@ -122,19 +132,26 @@ export function RingView({ compact = false }: RingViewProps) {
   // per model rather than once per request.
   const arcs = useMemo(() => ownedArcs(model.virtualNodes), [model.virtualNodes])
 
-  const traces = useMemo(
-    () =>
-      requests
-        .map((request) => traceRequest(model.virtualNodes, request.key, arcs))
-        .filter((trace): trace is RoutingTrace => trace !== undefined),
-    [requests, model.virtualNodes, arcs],
+  const request = requests[state.index]
+
+  // One trace, for the key in flight. Tracing all of them up front was fine at
+  // twelve and is 2000 x 1600 arc comparisons at the top of both sliders, on
+  // every parameter change.
+  const trace: RoutingTrace | undefined = useMemo(
+    () => (request ? traceRequest(model.virtualNodes, request.key, arcs) : undefined),
+    [request, model.virtualNodes, arcs],
   )
 
-  const trace = traces[state.index]
-  const request = requests[state.index]
-  const routed = useMemo(() => traces.slice(0, state.completed), [traces, state.completed])
-
   const inFlight = trace !== undefined && request !== undefined && !state.finished
+
+  // Below half a second a flight is not five readable steps, so the narration
+  // stops animating them and reports whichever key it caught, a few times a
+  // second. Without this the panel rewrites forty times a second at 2000 keys.
+  const settled = pace < READABLE_FLIGHT_SECONDS
+  const narrated = useThrottled(
+    useMemo(() => ({ trace, request }), [trace, request]),
+    settled ? NARRATION_HOLD_MS : 0,
+  )
 
   // Isolating the owner at the moment of resolution is the payoff of the whole
   // flight: the answer is not just "this replica" but "therefore this node,
@@ -171,13 +188,13 @@ export function RingView({ compact = false }: RingViewProps) {
         assignment: model.assignment,
         focusedNodeId,
         focusStrength: hoveredNodeId === undefined ? 'soft' : 'strong',
-        flight: inFlight && trace && request ? { trace, phase, label: requestLabel(request) } : undefined,
-        routed,
+        flight:
+          inFlight && trace && request ? { trace, phase, label: requestLabel(request) } : undefined,
       },
       prepared.width,
       prepared.height,
     )
-  }, [model, tokens, focusedNodeId, hoveredNodeId, inFlight, trace, request, phase, routed])
+  }, [model, tokens, focusedNodeId, hoveredNodeId, inFlight, trace, request, phase])
 
   useEffect(() => {
     render()
@@ -251,9 +268,10 @@ export function RingView({ compact = false }: RingViewProps) {
       <div className="ringView__side">
         {compact ? null : (
           <TracePanel
-            trace={trace}
-            request={request}
+            trace={narrated.trace}
+            request={narrated.request}
             phase={phase}
+            settled={settled}
             nodeIds={model.nodeIds}
             tokens={tokens}
           />
@@ -399,14 +417,18 @@ const Controls = memo(function Controls({
         value={params.virtualNodes}
         onChange={(virtualNodes) => onChange({ virtualNodes })}
       />
+      {/* Logarithmic. A linear 1-2000 track gives the first ten keys 0.5% of
+        * its length, about two pixels, so the range where the mechanism is
+        * followable one key at a time is unreachable. By ratio instead, 31% of
+        * the travel covers 1-10 keys and 40% covers 1-20. */}
       <Slider
         id="keys"
         label="keys"
-        min={200}
-        max={5000}
-        step={200}
-        value={params.keyCount}
-        onChange={(keyCount) => onChange({ keyCount })}
+        min={0}
+        max={KEY_SLIDER_STEPS}
+        value={sliderFromKeys(params.keyCount)}
+        display={params.keyCount}
+        onChange={(position) => onChange({ keyCount: keysFromSlider(position) })}
       />
       <Slider
         id="seed"
@@ -427,16 +449,19 @@ interface SliderProps {
   readonly max: number
   readonly step?: number
   readonly value: number
+  /** Shown instead of `value` when the track is a scale rather than the number. */
+  readonly display?: number
   readonly onChange: (value: number) => void
 }
 
-function Slider({ id, label, min, max, step = 1, value, onChange }: SliderProps) {
+function Slider({ id, label, min, max, step = 1, value, display, onChange }: SliderProps) {
+  const shown = display ?? value
   return (
     <div className="slider">
       <label className="slider__label" htmlFor={id}>
         <span>{label}</span>
         <output className="numeric" htmlFor={id}>
-          {value}
+          {shown}
         </output>
       </label>
       <input
@@ -448,6 +473,13 @@ function Slider({ id, label, min, max, step = 1, value, onChange }: SliderProps)
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
+        aria-valuetext={String(shown)}
+        /* Browsers restore form-control values across a reload and feed them
+         * back through input events, which React accepts -- so reloading the
+         * page silently replaced the chosen defaults with whatever the sliders
+         * were last dragged to. The defaults here are measured and documented;
+         * a reload should show them. */
+        autoComplete="off"
       />
     </div>
   )

@@ -6,7 +6,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SECONDS_PER_REQUEST } from './timeline'
 import type { Speed } from './timeline'
 
 /**
@@ -32,7 +31,11 @@ export interface Timeline {
   readonly setSpeed: (speed: Speed) => void
 }
 
-export function useTimeline(requestCount: number, autoPlay: boolean): Timeline {
+export function useTimeline(
+  requestCount: number,
+  secondsPerRequest: number,
+  autoPlay: boolean,
+): Timeline {
   const [cursor, setCursor] = useState(0)
   const [playing, setPlaying] = useState(autoPlay)
   const [speed, setSpeed] = useState<Speed>(1)
@@ -41,6 +44,12 @@ export function useTimeline(requestCount: number, autoPlay: boolean): Timeline {
   const lastRef = useRef<number | undefined>(undefined)
   const speedRef = useRef<Speed>(speed)
   speedRef.current = speed
+
+  // Read through a ref inside the frame loop. The pace changes with the key
+  // count, and putting it in the effect's dependencies would tear down and
+  // rebuild the rAF loop on every drag of the key slider.
+  const paceRef = useRef(secondsPerRequest)
+  paceRef.current = secondsPerRequest
 
   // Restarting from the end is what a visitor means by "play" at that point;
   // otherwise the button appears dead.
@@ -93,7 +102,7 @@ export function useTimeline(requestCount: number, autoPlay: boolean): Timeline {
 
       if (previous !== undefined) {
         const elapsed = Math.min((now - previous) / 1000, MAX_FRAME_SECONDS)
-        const advance = (elapsed * speedRef.current) / SECONDS_PER_REQUEST
+        const advance = (elapsed * speedRef.current) / paceRef.current
 
         setCursor((current) => {
           const next = current + advance
@@ -133,6 +142,45 @@ export function useTimeline(requestCount: number, autoPlay: boolean): Timeline {
  * content is never withheld — the visitor drives it instead of being driven,
  * which is the actual request behind the setting.
  */
+/**
+ * Hold a value still for `ms` between updates.
+ *
+ * The narration panel needs this and the canvas does not. At two thousand keys
+ * a flight lasts 25ms, so the panel's five rows would rewrite forty times a
+ * second: unreadable as text and unpleasant to look at. The canvas is fine at
+ * that rate because a moving dot is what it is meant to look like.
+ *
+ * `ms <= 0` returns the value untouched rather than routing it through state,
+ * so the common case adds no extra render.
+ */
+export function useThrottled<T>(value: T, ms: number): T {
+  const [held, setHeld] = useState(value)
+  const lastRef = useRef(0)
+
+  useEffect(() => {
+    if (ms <= 0) {
+      return
+    }
+
+    const elapsed = performance.now() - lastRef.current
+
+    if (elapsed >= ms) {
+      lastRef.current = performance.now()
+      setHeld(value)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      lastRef.current = performance.now()
+      setHeld(value)
+    }, ms - elapsed)
+
+    return () => clearTimeout(timer)
+  }, [value, ms])
+
+  return ms <= 0 ? value : held
+}
+
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
 export function usePrefersReducedMotion(): boolean {

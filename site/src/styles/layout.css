@@ -359,7 +359,7 @@
     grid-area: scrub;
   }
 
-  .transport__speeds {
+  .transport__speedPicker {
     grid-area: speeds;
     justify-content: flex-end;
   }
@@ -382,7 +382,8 @@
   background: transparent;
   color: var(--ink-secondary);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease),
+  transition:
+    color var(--duration-fast) var(--ease),
     border-color var(--duration-fast) var(--ease);
 }
 
@@ -414,8 +415,10 @@
   color: var(--ink-faint);
   margin-left: var(--space-1);
   /* Reserve room for the widest value so the scrubber does not shift left by a
-   * pixel every time the request index gains a digit. */
-  min-width: 2.75rem;
+   * pixel every time the key counter gains a digit. At 2000 keys that is
+   * "2000/2000", which is why this is wider than it looks like it needs. */
+  min-width: 5.25rem;
+  text-align: right;
 }
 
 .transport__scrub {
@@ -424,28 +427,32 @@
   accent-color: var(--accent);
 }
 
-.transport__speeds {
+.transport__speedPicker {
   display: flex;
-  gap: var(--space-1);
+  align-items: center;
 }
 
-.transport__speed {
-  padding: 0.125rem var(--space-2);
-  border: 1px solid transparent;
+.transport__speedSelect {
+  padding: 0.125rem 0.25rem;
+  border: 1px solid var(--rule-strong);
   border-radius: var(--radius-interactive);
   background: transparent;
-  color: var(--ink-faint);
+  color: var(--ink-secondary);
+  font-family: var(--font-mono);
   font-size: var(--text-micro);
   cursor: pointer;
 }
 
-.transport__speed:hover {
+.transport__speedSelect:hover {
   color: var(--ink-primary);
 }
 
-.transport__speed[aria-pressed='true'] {
+/* The option list is painted by the OS, which does not inherit the page
+ * surface, so both sides are set explicitly or dark mode gets white-on-white
+ * in the open dropdown. */
+.transport__speedSelect option {
+  background: var(--surface);
   color: var(--ink-primary);
-  border-color: var(--rule-strong);
 }
 
 /* ── Step narration ─────────────────────────────────────────────────────── */

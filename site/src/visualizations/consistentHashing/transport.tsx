@@ -109,24 +109,31 @@ export function Transport({
         max={requestCount}
         step={0.01}
         value={cursor}
+        autoComplete="off"
         onChange={(event) => onSeek(Number(event.target.value))}
         aria-label="Seek through requests"
         aria-valuetext={`Request ${current} of ${requestCount}`}
       />
 
-      <div className="transport__speeds" role="group" aria-label="Playback speed">
-        {SPEEDS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            className="transport__speed numeric"
-            aria-pressed={option === speed}
-            onClick={() => onSpeed(option)}
-          >
-            {option}x
-          </button>
-        ))}
-      </div>
+      {/* A select rather than a row of buttons. Seven rates as buttons cost
+        * about 240px of a 512px bar, which squeezed the scrubber back down to
+        * the ~80px that made it unusable before. A select is one control wide,
+        * and it is keyboard and screen-reader complete for free. */}
+      <label className="transport__speedPicker">
+        <span className="visuallyHidden">Playback speed</span>
+        <select
+          className="transport__speedSelect numeric"
+          value={speed}
+          autoComplete="off"
+          onChange={(event) => onSpeed(Number(event.target.value) as Speed)}
+        >
+          {SPEEDS.map((option) => (
+            <option key={option} value={option}>
+              {option}x
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   )
 }
@@ -143,12 +150,25 @@ interface TracePanelProps {
   readonly trace: RoutingTrace | undefined
   readonly request: Request | undefined
   readonly phase: PhaseState
+  /**
+   * True once flights are too short to read as five separate steps. The panel
+   * then shows the whole trace at once for whichever key it caught, rather
+   * than strobing through the steps forty times a second.
+   */
+  readonly settled: boolean
   readonly nodeIds: readonly NodeId[]
   readonly tokens: VizTokens
 }
 
-export function TracePanel({ trace, request, phase, nodeIds, tokens }: TracePanelProps) {
-  const activeIndex = STEPS.findIndex((step) => step.phase === phase.phase)
+export function TracePanel({
+  trace,
+  request,
+  phase,
+  settled,
+  nodeIds,
+  tokens,
+}: TracePanelProps) {
+  const activeIndex = settled ? STEPS.length : STEPS.findIndex((step) => step.phase === phase.phase)
 
   return (
     <div className="panel">
@@ -177,8 +197,9 @@ export function TracePanel({ trace, request, phase, nodeIds, tokens }: TracePane
 
       {request ? (
         <p className="panel__note">
-          one of {request.outOf.toLocaleString()} keys on the ring. every other key got
-          here the same way.
+          {request.outOf === 1
+            ? 'the only key on the ring.'
+            : `every one of the ${request.outOf.toLocaleString()} keys gets here the same way.`}
         </p>
       ) : null}
 
