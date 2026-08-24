@@ -48,9 +48,9 @@ export interface Rng {
  * The ring itself: a sorted collection of virtual node positions over the
  * hash space, supporting clockwise lookup.
  *
- * Mutable by design. Immutability lives one level up: `stateAt(index)` in
- * run.ts replays operations into a *fresh* ring, so no ring is ever shared
- * between two points on the timeline.
+ * Mutable by design. Immutability lives one level up: `buildRingModel` builds
+ * a *fresh* ring for each set of control values and never mutates one in
+ * place, so no ring is shared between two states the page can show.
  */
 export interface Ring {
   /** Add a physical node occupying `virtualNodes` positions on the ring. */

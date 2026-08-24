@@ -281,17 +281,29 @@
 
 .ringView__stage {
   position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-3);
   width: 100%;
-  /* Square, because a ring in a 16:9 box is a small ring with wasted margins. */
-  aspect-ratio: 1;
-  max-height: 26rem;
-  margin-inline: auto;
+  min-width: 0;
+}
+
+/* The stage is focusable so space and the arrow keys can drive playback
+ * without first tabbing to a button. */
+.ringView__stage:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .ringView__canvas {
-  width: 100%;
-  height: 100%;
   display: block;
+  width: 100%;
+  /* Square, because a ring in a 16:9 box is a small ring with wasted margins.
+   * Capped on width rather than height so it stays square instead of being
+   * squashed into an oval frame with the circle stranded in the middle. */
+  aspect-ratio: 1;
+  max-width: 26rem;
+  margin-inline: auto;
 }
 
 .ringView__side {
@@ -305,8 +317,201 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ringView__stage {
-    max-height: 20rem;
+  .ringView__canvas {
+    max-width: 20rem;
+  }
+}
+
+/* ── Transport ──────────────────────────────────────────────────────────── */
+
+.transport {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  /* Wider than the 26rem canvas above it, deliberately. Matching the ring's
+   * width left the scrubber 98px for twelve requests, which is 8px per target
+   * and unusable; the buttons, counter and speed switch cost a fixed ~294px
+   * and everything left over goes to the scrubber. */
+  max-width: 32rem;
+  margin-inline: auto;
+}
+
+/* Below this the three groups still fit on one line, but only by squeezing the
+ * scrubber to about 40px, which is not a control any more. Stacking gives it
+ * the full width instead. Measured: buttons 130px + counter 44px + speeds
+ * 120px + gaps leaves ~40px of a 358px content box. */
+@media (max-width: 560px) {
+  .transport {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'buttons speeds'
+      'scrub scrub';
+    row-gap: var(--space-2);
+  }
+
+  .transport__buttons {
+    grid-area: buttons;
+  }
+
+  .transport__scrub {
+    grid-area: scrub;
+  }
+
+  .transport__speeds {
+    grid-area: speeds;
+    justify-content: flex-end;
+  }
+}
+
+.transport__buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.transport__button {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-interactive);
+  background: transparent;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease);
+}
+
+.transport__button:hover:not(:disabled) {
+  color: var(--ink-primary);
+  border-color: var(--ink-secondary);
+}
+
+.transport__button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The one primary action on the figure, so it takes the accent. */
+.transport__button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.transport__button--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-ink);
+}
+
+.transport__count {
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+  margin-left: var(--space-1);
+  /* Reserve room for the widest value so the scrubber does not shift left by a
+   * pixel every time the request index gains a digit. */
+  min-width: 2.75rem;
+}
+
+.transport__scrub {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.transport__speeds {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.transport__speed {
+  padding: 0.125rem var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-interactive);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--text-micro);
+  cursor: pointer;
+}
+
+.transport__speed:hover {
+  color: var(--ink-primary);
+}
+
+.transport__speed[aria-pressed='true'] {
+  color: var(--ink-primary);
+  border-color: var(--rule-strong);
+}
+
+/* ── Step narration ─────────────────────────────────────────────────────── */
+
+/* The trace in words, which stays readable at virtual node counts where the
+ * drawn walk is a fraction of a degree. */
+.trace {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: trace;
+}
+
+.trace__step {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  font-size: var(--text-micro);
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.trace__step::before {
+  counter-increment: trace;
+  content: counter(trace);
+  color: var(--ink-faint);
+  margin-right: var(--space-2);
+}
+
+.trace__label {
+  color: var(--ink-muted);
+  flex: 1;
+}
+
+.trace__value {
+  color: var(--ink-secondary);
+  text-align: right;
+}
+
+/* Three states, and the distinction is carried by opacity and weight rather
+ * than by colour: the value cell already uses colour to name the owning node,
+ * and a second colour meaning "current step" would collide with it. */
+.trace__step[data-state='pending'] {
+  opacity: 0.35;
+}
+
+.trace__step[data-state='active'] .trace__label,
+.trace__step[data-state='active'] .trace__value {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+
+.trace__wrap {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trace__step {
+    transition: none;
+  }
+
+  .transport__button {
+    transition: none;
   }
 }
 

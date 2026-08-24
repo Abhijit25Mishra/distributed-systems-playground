@@ -27,6 +27,12 @@ export interface OwnedArc {
   readonly endAngle: number
   /** Share of the whole ring, in [0, 1]. */
   readonly share: number
+  /**
+   * The virtual node this arc terminates at, which is the replica a lookup
+   * landing anywhere in this arc resolves to. Carried so the routing trace can
+   * name the exact replica ("n3#41") without a second search of its own.
+   */
+  readonly owner: VirtualNode
 }
 
 export function angleOf(position: Position): number {
@@ -78,10 +84,32 @@ export function ownedArcs(sorted: readonly VirtualNode[]): OwnedArc[] {
       startAngle: angleOf(previous.position),
       endAngle: angleOf(owner.position),
       share: span / HASH_SPACE_SIZE,
+      owner,
     })
   }
 
   return arcs
+}
+
+/** Clockwise sweep of an arc, in radians, always non-negative. */
+export function sweepOf(arc: OwnedArc): number {
+  return (arc.endAngle - arc.startAngle + TAU) % TAU
+}
+
+/**
+ * The arc containing an angle, or undefined if the ring has none.
+ *
+ * This is the containment rule the whole picture rests on, so it lives in one
+ * place rather than being re-derived by each caller. `ownedArcs` already
+ * encodes *which* virtual node owns a span; this answers *which span* a given
+ * angle falls in. Together they resolve an angle to a replica without a second
+ * search, and `geometry.test.ts` checks the pair against the real `lookup`.
+ */
+export function arcContaining(
+  arcs: readonly OwnedArc[],
+  angle: number,
+): OwnedArc | undefined {
+  return arcs.find((arc) => ((angle - arc.startAngle + TAU) % TAU) <= sweepOf(arc))
 }
 
 /**
@@ -106,8 +134,7 @@ export function widestArcPerNode(arcs: readonly OwnedArc[]): Map<NodeId, OwnedAr
 
 /** Midpoint angle of an arc, accounting for the wrap at 12 o'clock. */
 export function midAngle(arc: OwnedArc): number {
-  const sweep = (arc.endAngle - arc.startAngle + TAU) % TAU
-  return arc.startAngle + sweep / 2
+  return arc.startAngle + sweepOf(arc) / 2
 }
 
 const RELAXATION_PASSES = 60
