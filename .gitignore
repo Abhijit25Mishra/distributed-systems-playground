@@ -23,11 +23,24 @@ maelstrom/
 # Local scratch (profile repo clone etc.)
 tmp/
 
+# playwright-cli session artifacts (snapshots, console logs)
+.playwright-cli/
+
+# Local poke-at-it script, run with `npx vite-node scratch.ts`
+site/scratch.ts
+
 # Editors / local
 .idea/
 .vscode/
 .claude/settings.local.json
 
+# Third-party skills — restore with `npx skills experimental_install`
+# (skills-lock.json IS committed; the vendored copies are not)
+.claude/skills/
+
 # Env
 .env
 .env.*
+
+# Local-only project context (holds credentials — never commit)
+CLAUDE.local.md
