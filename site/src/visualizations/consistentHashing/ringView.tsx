@@ -5,7 +5,7 @@ import type { RingParams } from './model'
 import { ownedArcs } from './geometry'
 import { phaseAt, traceRequest } from './trace'
 import type { RoutingTrace } from './trace'
-import { buildRequests, cursorState, DEFAULT_REQUEST_COUNT } from './timeline'
+import { cursorState, DEFAULT_REQUEST_COUNT, requestLabel, sampleRequests } from './timeline'
 import { usePrefersReducedMotion, useTimeline } from './useTimeline'
 import { Transport, TracePanel } from './transport'
 import { useVizTokens } from '../../theme/vizTokens'
@@ -60,35 +60,38 @@ import type { NodeId } from './types'
  * slider would read sampling noise as a real effect. 2000 costs nothing to
  * draw now that the key dots are batched by owner.
  *
- * ── seed: 444 ───────────────────────────────────────────────────────────────
+ * ── seed: 54 ────────────────────────────────────────────────────────────────
  * Chosen so the run demonstrates the wrap. A key hashing past the last replica
  * belongs to the first one, and `ring.ts` calls getting that wrong "the single
- * most common bug in a consistent hashing implementation" -- but only 257 of
- * 999 seeds produce a run containing one, so at a random seed there is a 74%
- * chance the figure never shows the case it most needs to.
+ * most common bug in a consistent hashing implementation", but a random seed
+ * mostly does not produce one: of 999 seeds, only a minority yield a sample
+ * containing exactly one wrap, and almost none of those also keep every walk
+ * visible and visit more than two nodes.
  *
- * At 444, request 2 (doc:1271) hashes to 357.8 degrees, a hair before 12
- * o'clock, and walks 27 degrees clockwise through zero to land on n2#4. Every
- * other walk in the run is at least 16px, so none of the twelve reads as the
- * key not having moved, and the statistics are unremarkable: churn 19.1%
- * against a theoretical 20.0%, skew 0.318.
+ * Seed 54 was the only seed of 999 satisfying all four: the wrap lands on
+ * request 4 rather than at the end of the run, so autoplay reaches it in about
+ * ten seconds; every walk is at least 10px, so none reads as the key not
+ * having moved; and the twelve requests between them land on all four nodes.
+ * Request 4 hashes to 359.5 degrees, a hair before 12 o'clock, and walks 25.5
+ * degrees clockwise through zero to n2#4. Statistics stay unremarkable: churn
+ * 21.1% against a theoretical 20.0%, skew 0.371 against 1/sqrt(8) = 0.354.
  *
  * This is choosing which example to show, not changing what happens. Every
- * request is hashed and routed by the same code as any other seed; drag the
- * slider and the wrap will usually disappear, which is itself worth seeing.
+ * key is hashed and routed by the same code at any seed; drag the slider and
+ * the wrap usually disappears, which is itself worth seeing.
  *
  * ── the caveat that survives both ───────────────────────────────────────────
  * Node positions come from hash("n1#0") and do not depend on the seed, so the
  * seed slider re-rolls the keys but never the topology. Across 40 independent
  * topologies the true skew at a single V spans roughly a factor of five; this
- * one sits at 0.331 for V=8 against a theoretical 0.354. The figure shows one
+ * one sits at 0.371 for V=8 against a theoretical 0.354. The figure shows one
  * ring, not the average of all rings.
  */
 const DEFAULTS: RingParams = {
   nodeCount: 4,
   virtualNodes: 8,
   keyCount: 2000,
-  seed: 444,
+  seed: 54,
 }
 
 interface RingViewProps {
@@ -103,9 +106,12 @@ export function RingView({ compact = false }: RingViewProps) {
 
   const reducedMotion = usePrefersReducedMotion()
   const model = useMemo(() => buildRingModel(params), [params])
+
+  // Sampled from the keys the figure is already drawing, not invented
+  // alongside them. Every flight is one of the dots on screen.
   const requests = useMemo(
-    () => buildRequests(params.seed, DEFAULT_REQUEST_COUNT),
-    [params.seed],
+    () => sampleRequests(model.keys, DEFAULT_REQUEST_COUNT),
+    [model.keys],
   )
 
   const timeline = useTimeline(requests.length, !reducedMotion)
@@ -119,19 +125,28 @@ export function RingView({ compact = false }: RingViewProps) {
   const traces = useMemo(
     () =>
       requests
-        .map((key) => traceRequest(model.virtualNodes, key, arcs))
+        .map((request) => traceRequest(model.virtualNodes, request.key, arcs))
         .filter((trace): trace is RoutingTrace => trace !== undefined),
     [requests, model.virtualNodes, arcs],
   )
 
   const trace = traces[state.index]
+  const request = requests[state.index]
   const routed = useMemo(() => traces.slice(0, state.completed), [traces, state.completed])
+
+  const inFlight = trace !== undefined && request !== undefined && !state.finished
 
   // Isolating the owner at the moment of resolution is the payoff of the whole
   // flight: the answer is not just "this replica" but "therefore this node,
   // and these are all the other places it sits on the ring".
+  //
+  // Gated on the run still being live. A finished run sits at progress 1,
+  // which is inside the resolve phase, so without this the figure stayed
+  // dimmed onto the last node it happened to touch and never came back --
+  // leaving the resting state of the whole visualization a greyed-out ring
+  // highlighting an arbitrary node.
   const focusedNodeId =
-    hoveredNodeId ?? (phase.phase === 'resolve' ? trace?.owner : undefined)
+    hoveredNodeId ?? (inFlight && phase.phase === 'resolve' ? trace?.owner : undefined)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -156,13 +171,13 @@ export function RingView({ compact = false }: RingViewProps) {
         assignment: model.assignment,
         focusedNodeId,
         focusStrength: hoveredNodeId === undefined ? 'soft' : 'strong',
-        flight: trace && !state.finished ? { trace, phase } : undefined,
+        flight: inFlight && trace && request ? { trace, phase, label: requestLabel(request) } : undefined,
         routed,
       },
       prepared.width,
       prepared.height,
     )
-  }, [model, tokens, focusedNodeId, hoveredNodeId, trace, phase, routed, state.finished])
+  }, [model, tokens, focusedNodeId, hoveredNodeId, inFlight, trace, request, phase, routed])
 
   useEffect(() => {
     render()
@@ -235,7 +250,13 @@ export function RingView({ compact = false }: RingViewProps) {
 
       <div className="ringView__side">
         {compact ? null : (
-          <TracePanel trace={trace} phase={phase} nodeIds={model.nodeIds} tokens={tokens} />
+          <TracePanel
+            trace={trace}
+            request={request}
+            phase={phase}
+            nodeIds={model.nodeIds}
+            tokens={tokens}
+          />
         )}
 
         <ChurnPanel ringChurn={model.ringChurn} modNChurn={model.modNChurn} />

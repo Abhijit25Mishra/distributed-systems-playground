@@ -1,33 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { buildRequests, cursorState, DEFAULT_REQUEST_COUNT } from './timeline'
+import { cursorState, requestLabel, sampleRequests } from './timeline'
+import { createRng, generateKeys } from './rng'
 
-describe('buildRequests', () => {
-  it('replays identically from the same seed', () => {
-    expect(buildRequests(42, 12)).toEqual(buildRequests(42, 12))
-  })
+const KEYS = generateKeys(createRng(444), 2000)
 
-  it('produces different requests for different seeds', () => {
-    expect(buildRequests(42, 12)).not.toEqual(buildRequests(43, 12))
-  })
-
-  it('produces distinct keys, not the same key repeated', () => {
-    // This assertion exists because its absence hid a real bug once: an
-    // earlier generator passed "replays identically from the same seed" while
-    // returning 500 copies of one string. Reproducibility is satisfied by any
-    // constant, so it proves nothing on its own.
-    const requests = buildRequests(42, 40)
-    expect(new Set(requests).size).toBeGreaterThan(requests.length * 0.8)
-  })
-
-  it('names keys in a readable form', () => {
-    buildRequests(42, DEFAULT_REQUEST_COUNT).forEach((key) => {
-      expect(key).toMatch(/^[a-z]+:\d{4}$/)
+describe('sampleRequests', () => {
+  it('only ever returns keys that are in the set', () => {
+    // The point of the whole change: a request is one of the keys the figure
+    // is already drawing. An earlier version invented its own keys alongside
+    // the cloud, so the figure claimed two thousand keys and then animated
+    // twelve things that were not among them.
+    const present = new Set(KEYS)
+    sampleRequests(KEYS, 12).forEach((request) => {
+      expect(present.has(request.key)).toBe(true)
     })
   })
 
-  it('returns exactly the count asked for', () => {
-    expect(buildRequests(1, 0)).toHaveLength(0)
-    expect(buildRequests(1, 7)).toHaveLength(7)
+  it('reports the ordinal of the key it actually picked', () => {
+    sampleRequests(KEYS, 12).forEach((request) => {
+      expect(KEYS[request.ordinal - 1]).toBe(request.key)
+      expect(request.outOf).toBe(KEYS.length)
+    })
+  })
+
+  it('spreads the sample across the whole set rather than clustering', () => {
+    const ordinals = sampleRequests(KEYS, 12).map((request) => request.ordinal)
+
+    expect(Math.min(...ordinals)).toBeLessThan(KEYS.length * 0.1)
+    expect(Math.max(...ordinals)).toBeGreaterThan(KEYS.length * 0.9)
+  })
+
+  it('returns distinct keys, not the same one repeated', () => {
+    // Same assertion that caught a degenerate generator once before: any
+    // constant satisfies "reproducible", so distinctness has to be checked
+    // separately or it proves nothing.
+    const requests = sampleRequests(KEYS, 40)
+    expect(new Set(requests.map((request) => request.key)).size).toBe(requests.length)
+  })
+
+  it('is reproducible for the same key set', () => {
+    expect(sampleRequests(KEYS, 12)).toEqual(sampleRequests(KEYS, 12))
+  })
+
+  it('never asks for more requests than there are keys', () => {
+    expect(sampleRequests(KEYS.slice(0, 5), 12)).toHaveLength(5)
+  })
+
+  it('survives an empty key set and a zero count', () => {
+    expect(sampleRequests([], 12)).toEqual([])
+    expect(sampleRequests(KEYS, 0)).toEqual([])
+  })
+
+  it('never indexes past the end of the set', () => {
+    for (let count = 1; count <= 60; count += 1) {
+      sampleRequests(KEYS, count).forEach((request) => {
+        expect(request.ordinal).toBeGreaterThanOrEqual(1)
+        expect(request.ordinal).toBeLessThanOrEqual(KEYS.length)
+      })
+    }
+  })
+})
+
+describe('requestLabel', () => {
+  it('names the key by its place in the set', () => {
+    const first = sampleRequests(KEYS, 12)[0]
+    expect(first).toBeDefined()
+    expect(requestLabel(first!)).toBe(`key ${first!.ordinal}`)
   })
 })
 

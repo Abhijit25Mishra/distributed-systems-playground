@@ -13,8 +13,8 @@ import { HASH_SPACE_SIZE } from './types'
 import { formatPosition } from './renderer'
 import { replicaName } from './trace'
 import type { FlightPhase, PhaseState, RoutingTrace } from './trace'
-import { SPEEDS } from './timeline'
-import type { Speed } from './timeline'
+import { requestLabel, SPEEDS } from './timeline'
+import type { Request, Speed } from './timeline'
 import { seriesColor } from '../../theme/vizTokens'
 import type { VizTokens } from '../../theme/vizTokens'
 import type { NodeId } from './types'
@@ -132,7 +132,7 @@ export function Transport({
 }
 
 const STEPS: readonly { readonly phase: FlightPhase; readonly label: string }[] = [
-  { phase: 'arrive', label: 'request arrives' },
+  { phase: 'arrive', label: 'take one key' },
   { phase: 'hash', label: 'hash the key' },
   { phase: 'drop', label: 'that is its position' },
   { phase: 'walk', label: 'walk clockwise' },
@@ -141,17 +141,18 @@ const STEPS: readonly { readonly phase: FlightPhase; readonly label: string }[] 
 
 interface TracePanelProps {
   readonly trace: RoutingTrace | undefined
+  readonly request: Request | undefined
   readonly phase: PhaseState
   readonly nodeIds: readonly NodeId[]
   readonly tokens: VizTokens
 }
 
-export function TracePanel({ trace, phase, nodeIds, tokens }: TracePanelProps) {
+export function TracePanel({ trace, request, phase, nodeIds, tokens }: TracePanelProps) {
   const activeIndex = STEPS.findIndex((step) => step.phase === phase.phase)
 
   return (
     <div className="panel">
-      <p className="label">routing one request</p>
+      <p className="label">routing one key</p>
 
       <ol className="trace">
         {STEPS.map((step, index) => {
@@ -165,14 +166,21 @@ export function TracePanel({ trace, phase, nodeIds, tokens }: TracePanelProps) {
                  * the landing replica while the key is still mid-walk gives
                  * away the answer before the mechanism that produces it, which
                  * is the one thing this panel exists to show. */}
-                {trace && state !== 'pending'
-                  ? valueFor(step.phase, trace, nodeIds, tokens)
+                {trace && request && state !== 'pending'
+                  ? valueFor(step.phase, trace, requestLabel(request), nodeIds, tokens)
                   : '·'}
               </span>
             </li>
           )
         })}
       </ol>
+
+      {request ? (
+        <p className="panel__note">
+          one of {request.outOf.toLocaleString()} keys on the ring. every other key got
+          here the same way.
+        </p>
+      ) : null}
 
       {trace?.wrapped ? (
         <p className="panel__note trace__wrap">
@@ -182,8 +190,8 @@ export function TracePanel({ trace, phase, nodeIds, tokens }: TracePanelProps) {
 
       {/* Announced only when the answer changes, not on every frame. */}
       <p className="visuallyHidden" aria-live="polite">
-        {trace && phase.phase === 'resolve'
-          ? `${trace.key} routed to ${trace.owner}, replica ${trace.landing.replica}`
+        {trace && request && phase.phase === 'resolve'
+          ? `${requestLabel(request)} of ${request.outOf} routed to ${trace.owner}, replica ${trace.landing.replica}`
           : ''}
       </p>
     </div>
@@ -200,12 +208,13 @@ function traceState(index: number, activeIndex: number): 'done' | 'active' | 'pe
 function valueFor(
   phase: FlightPhase,
   trace: RoutingTrace,
+  label: string,
   nodeIds: readonly NodeId[],
   tokens: VizTokens,
 ): React.ReactNode {
   switch (phase) {
     case 'arrive':
-      return trace.key
+      return label
     case 'hash':
       return formatPosition(trace.position)
     case 'drop':

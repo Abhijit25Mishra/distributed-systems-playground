@@ -11,36 +11,61 @@
  * property that lets a URL carry a position later.
  */
 
-import { createRng } from './rng'
 import { clamp01 } from './trace'
 import type { KeyId } from './types'
 
-/**
- * Request keys are named, unlike the background key cloud.
- *
- * The cloud uses the hand-written `generateKeys`, which returns raw floats —
- * fine for a dot, useless as a label. A request is the one key the visitor
- * actually reads, and `user:4821` says "this is a lookup for a thing" in a way
- * that `0.18998925131745636` does not. They are different objects: the cloud
- * is what is stored, a request is a question being asked about one of them.
- */
-const KEY_KINDS = ['user', 'cart', 'order', 'session', 'photo', 'doc', 'inbox', 'invoice'] as const
-
-const REQUEST_ID_MIN = 1000
-const REQUEST_ID_MAX = 9999
-
 export const DEFAULT_REQUEST_COUNT = 12
 
-export function buildRequests(seed: number, count: number): KeyId[] {
-  const rng = createRng(seed)
-  const requests: KeyId[] = []
+export interface Request {
+  readonly key: KeyId
+  /** 1-based position in the key set. */
+  readonly ordinal: number
+  /** Total keys the sample was drawn from. */
+  readonly outOf: number
+}
 
-  for (let i = 0; i < count; i += 1) {
-    const kind = KEY_KINDS[rng.nextInt(0, KEY_KINDS.length - 1)] ?? KEY_KINDS[0]
-    requests.push(`${kind}:${rng.nextInt(REQUEST_ID_MIN, REQUEST_ID_MAX)}`)
+/**
+ * The requests to animate, drawn from the keys the figure is already showing.
+ *
+ * This used to invent its own keys with readable names -- `cart:9918` and so
+ * on -- while the cloud behind them held a different two thousand keys that
+ * shared nothing with them. The figure therefore claimed a scale and then
+ * animated twelve things that were not part of it, and the two populations
+ * were even drawn at different radii, so they read as different kinds of
+ * object. That is incoherent whether or not anyone notices the arithmetic.
+ *
+ * Now a request is one of the keys on screen, and its label says which one, so
+ * "this is what happened to all two thousand" is something the visitor can
+ * check rather than take on faith.
+ *
+ * Sampled at even intervals rather than randomly: indices carry no relation to
+ * ring position, so evenly spaced indices give a well spread set of positions
+ * while staying reproducible and covering the whole set rather than clustering
+ * in whatever region a small random draw happened to favour.
+ */
+export function sampleRequests(keys: readonly KeyId[], count: number): Request[] {
+  if (keys.length === 0 || count <= 0) {
+    return []
+  }
+
+  const wanted = Math.min(count, keys.length)
+  const requests: Request[] = []
+
+  for (let i = 0; i < wanted; i += 1) {
+    const index = Math.floor(((i + 0.5) * keys.length) / wanted)
+    const key = keys[Math.min(index, keys.length - 1)]
+
+    if (key !== undefined) {
+      requests.push({ key, ordinal: index + 1, outOf: keys.length })
+    }
   }
 
   return requests
+}
+
+/** Label tying a request back to the dot it is, e.g. "key 1483". */
+export function requestLabel(request: Request): string {
+  return `key ${request.ordinal}`
 }
 
 export interface CursorState {

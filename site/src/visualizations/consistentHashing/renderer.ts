@@ -28,6 +28,8 @@ import type { Assignment, KeyId, NodeId, VirtualNode } from './types'
 export interface Flight {
   readonly trace: RoutingTrace
   readonly phase: PhaseState
+  /** What to call the key on screen, e.g. "key 1483". */
+  readonly label: string
 }
 
 export interface RingScene {
@@ -313,9 +315,15 @@ function drawTicks(
 }
 
 /**
- * Requests already routed, left on the rim so the past is visible.
+ * Requests already routed, left in the key cloud so the past is visible.
  *
- * Drawn in the owning node's colour rather than the accent: once a request has
+ * Drawn at the cloud radius, not on the band, and that is the whole point.
+ * A routed request is one of the keys already on screen; putting its mark on
+ * the band made it look like a different kind of object living somewhere the
+ * other keys do not, which is exactly the confusion that made twelve requests
+ * and two thousand keys read as unrelated populations.
+ *
+ * In the owning node's colour rather than the accent: once a request has
  * resolved it is no longer live, it is a fact about the distribution, and the
  * accent is reserved for the one thing currently happening.
  */
@@ -331,13 +339,15 @@ function drawRouted(
     return
   }
 
+  const cloudRadius = radius * KEY_RADIUS_RATIO
+
   routed.forEach((trace) => {
-    const point = pointOn(center, radius, trace.keyAngle)
+    const point = pointOn(center, cloudRadius, trace.keyAngle)
 
     ctx.globalAlpha = alphaFor(scene, trace.owner, 'routed', 1)
 
-    // A surface ring so a routed dot sitting on the coloured band stays a
-    // separate mark instead of merging into it.
+    // A surface ring, so a routed key reads as one of the cloud dots turned up
+    // rather than as a new mark laid over them.
     ctx.beginPath()
     ctx.arc(point.x, point.y, ROUTED_DOT_RADIUS + 1.5, 0, Math.PI * 2)
     ctx.fillStyle = tokens.surface
@@ -385,7 +395,7 @@ function drawFlight(
   }
 
   if (hasReached(phase, 'drop')) {
-    drawFlyingKey(ctx, tokens, trace, phase, center, radius)
+    drawFlyingKey(ctx, tokens, scene, trace, phase, center, radius)
   }
 }
 
@@ -556,6 +566,7 @@ function drawLandingLabel(
 function drawFlyingKey(
   ctx: CanvasRenderingContext2D,
   tokens: VizTokens,
+  scene: RingScene,
   trace: RoutingTrace,
   phase: PhaseState,
   center: Point,
@@ -563,35 +574,74 @@ function drawFlyingKey(
 ): void {
   let angle = trace.keyAngle
   let distance = radius
+  let fill = tokens.accent
+  let size = FLIGHT_DOT_RADIUS
 
   if (phase.phase === 'drop') {
     distance = radius * easeOut(phase.local)
   } else if (phase.phase === 'walk') {
     angle = trace.keyAngle + trace.sweep * easeOut(phase.local)
   } else if (phase.phase === 'resolve') {
+    // Settle inward into the key cloud, shrinking to a cloud dot and taking
+    // the owner's colour. This is the second half of the answer and the part
+    // the figure previously only asserted: the key does not just find a
+    // replica, it becomes one of the keys that node holds. Ending the flight
+    // among the other two thousand dots is what makes the count on the load
+    // table something the visitor watched happen.
+    const settle = easeOut(phase.local)
     angle = trace.landingAngle
-  }
-
-  // Once landed, the coloured landing mark is the thing to look at; keeping a
-  // full-strength accent dot on top of it would argue with the answer.
-  const alpha = phase.phase === 'resolve' ? 1 - easeOut(phase.local) : 1
-  if (alpha <= 0.01) {
-    return
+    distance = radius - (radius - radius * KEY_RADIUS_RATIO) * settle
+    fill = blend(tokens.accent, colorFor(tokens, scene.nodeIds, trace.owner), settle)
+    size = FLIGHT_DOT_RADIUS - (FLIGHT_DOT_RADIUS - ROUTED_DOT_RADIUS) * settle
   }
 
   const point = pointOn(center, distance, angle)
 
-  ctx.globalAlpha = alpha
   ctx.beginPath()
-  ctx.arc(point.x, point.y, FLIGHT_DOT_RADIUS + 2, 0, Math.PI * 2)
+  ctx.arc(point.x, point.y, size + 2, 0, Math.PI * 2)
   ctx.fillStyle = tokens.surface
   ctx.fill()
 
   ctx.beginPath()
-  ctx.arc(point.x, point.y, FLIGHT_DOT_RADIUS, 0, Math.PI * 2)
-  ctx.fillStyle = tokens.accent
+  ctx.arc(point.x, point.y, size, 0, Math.PI * 2)
+  ctx.fillStyle = fill
   ctx.fill()
-  ctx.globalAlpha = 1
+}
+
+/**
+ * Mix two CSS colours, for the accent-to-owner handover as a key settles.
+ *
+ * Parses whatever `getComputedStyle` returned rather than assuming hex: the
+ * tokens are authored as hex but the browser hands back `rgb(...)`, and a
+ * naive hex parse would silently produce black for every blend. Falls back to
+ * a hard switch at the midpoint if either colour will not parse, which keeps
+ * an unfamiliar colour space looking abrupt rather than looking broken.
+ */
+function blend(from: string, to: string, amount: number): string {
+  const a = parseColor(from)
+  const b = parseColor(to)
+
+  if (!a || !b) {
+    return amount < 0.5 ? from : to
+  }
+
+  const mix = (i: number) => Math.round((a[i] ?? 0) + ((b[i] ?? 0) - (a[i] ?? 0)) * amount)
+  return `rgb(${mix(0)}, ${mix(1)}, ${mix(2)})`
+}
+
+function parseColor(value: string): [number, number, number] | null {
+  const rgb = value.match(/rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i)
+  if (rgb) {
+    return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])]
+  }
+
+  const hex = value.trim().match(/^#([0-9a-f]{6})$/i)
+  if (hex?.[1]) {
+    const n = parseInt(hex[1], 16)
+    return [Math.floor(n / 65536) % 256, Math.floor(n / 256) % 256, n % 256]
+  }
+
+  return null
 }
 
 /**
@@ -620,7 +670,7 @@ function drawReadout(
   ctx.globalAlpha = phase.phase === 'arrive' ? easeOut(phase.local) : 1
   ctx.font = '600 14px ui-monospace, monospace'
   ctx.fillStyle = tokens.inkStrong
-  ctx.fillText(trace.key, center.x, center.y - 9)
+  ctx.fillText(flight.label, center.x, center.y - 9)
   ctx.globalAlpha = 1
 
   if (hasReached(phase, 'hash')) {
