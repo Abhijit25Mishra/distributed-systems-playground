@@ -16,6 +16,7 @@ import { figureFor } from '../visualizations/registry'
 
 const SOURCE_PATHS: Readonly<Record<string, string>> = {
   'consistent-hashing': 'site/src/visualizations/consistentHashing/ring.ts',
+  'latency-percentiles': 'site/src/visualizations/latencyPercentiles/model.ts',
 }
 
 function neighbours(visualization: Visualization) {

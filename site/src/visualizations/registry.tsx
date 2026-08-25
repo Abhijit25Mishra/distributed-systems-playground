@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import { RingView } from './consistentHashing/ringView'
+import { LatencyView } from './latencyPercentiles/latencyView'
 
 /**
  * AGENT-OWNED — maps a slug to its figure.
@@ -17,6 +18,7 @@ export interface FigureProps {
 
 export const FIGURES: Readonly<Record<string, ComponentType<FigureProps>>> = {
   'consistent-hashing': RingView,
+  'latency-percentiles': LatencyView,
 }
 
 export function figureFor(slug: string): ComponentType<FigureProps> | undefined {

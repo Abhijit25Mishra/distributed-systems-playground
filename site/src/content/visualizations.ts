@@ -50,10 +50,10 @@ export const VISUALIZATIONS: readonly Visualization[] = [
     summary: 'why p99 matters more than the mean, fan-out amplification included',
     concept:
       'How a tail latency that affects one request in a hundred ends up affecting most users once a single page fans out to dozens of backend calls.',
-    status: 'planned',
+    status: 'live',
     planItem: 3,
     chapter: 'Ch 2 - Nonfunctional Requirements',
-    eta: 'Sep 2026',
+    eta: 'Aug 2026',
   },
   {
     slug: 'lsm-lifecycle',

@@ -75,7 +75,11 @@ Two notes carried forward from the 2026-08-15 findings (full detail in
 
 ### September 2026
 
-3. Latency percentiles explorer (viz)
+3. ~~Latency percentiles explorer (viz)~~ — **shipped early, 25 Aug**, and
+   built entirely by the agent at my request. I read the concept and there was
+   nothing in it I needed to write by hand; it earns its place on the site
+   rather than in my hands. One-off waiver of the hand-written boundary, noted
+   in `latencyPercentiles/model.ts` and in the 2026-08-25 journal entry.
 4. Mini LSM storage engine — part 1 (memtable, WAL, SSTable flush)
 5. Glomers: Unique ID Generation *(evening task)*
 

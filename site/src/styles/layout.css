@@ -261,7 +261,8 @@
 
 /* An interactive figure sizes itself. A fixed ratio would either crop the
  * controls or leave a gap under them. */
-.figure__plot:has(.ringView) {
+.figure__plot:has(.ringView),
+.figure__plot:has(.latencyView) {
   aspect-ratio: auto;
   max-height: none;
   place-items: stretch;
@@ -319,6 +320,77 @@
 
   .ringView__canvas {
     max-width: 20rem;
+  }
+}
+
+/* ── Latency figure ─────────────────────────────────────────────────────── */
+
+/* Same two-column shape as the ring. Duplicated rather than shared, per the
+ * no-shared-engine rule: the common layout gets extracted once three
+ * visualizations agree on what it is, not after two. */
+.latencyView {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4);
+  align-items: start;
+}
+
+.latencyView__stage {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Wide, not square: three stacked rows over a shared axis. Capped so the
+ * histograms do not stretch into bands on a large screen. */
+.latencyView__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 24rem;
+}
+
+.latencyView__stageBar {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.latencyView__side {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.latencyView__side > .panel:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.latencyTable__head {
+  color: var(--ink-faint);
+  font-weight: 400;
+  font-size: var(--text-micro);
+  text-align: right;
+}
+
+.latencyTable__cell {
+  text-align: right;
+  color: var(--ink-secondary);
+  padding-left: var(--space-2);
+}
+
+@media (max-width: 780px) {
+  .latencyView {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .latencyView__canvas {
+    aspect-ratio: 4 / 5;
+    max-height: 26rem;
   }
 }
 
